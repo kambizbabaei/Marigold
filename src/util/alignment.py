@@ -103,20 +103,20 @@ def align_depth_least_square(
 
     try:
         X = np.linalg.lstsq(A, gt_masked, rcond=None)[0]
-        scale, shift = X
+        scale, shift = float(X[0]), float(X[1])
         logger.info(f"Computed scale: {scale:.4f}, shift: {shift:.4f}")
     except np.linalg.LinAlgError as e:
         logger.error(f"Least squares failed: {str(e)}")
         # Try with a more stable rcond
         try:
             X = np.linalg.lstsq(A, gt_masked, rcond=1e-4)[0]
-            scale, shift = X
+            scale, shift = float(X[0]), float(X[1])
             logger.info(f"Computed scale (with rcond=1e-4): {scale:.4f}, shift: {shift:.4f}")
         except np.linalg.LinAlgError as e:
             logger.error(f"Least squares failed even with rcond=1e-4: {str(e)}")
             # Fallback to simple scaling
-            scale = np.mean(gt_masked) / np.mean(pred_masked)
-            shift = 0
+            scale = float(np.mean(gt_masked) / np.mean(pred_masked))
+            shift = 0.0
             logger.info(f"Using fallback scale: {scale:.4f}, shift: {shift:.4f}")
 
     aligned_pred = pred_arr * scale + shift
