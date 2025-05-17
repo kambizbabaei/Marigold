@@ -546,6 +546,22 @@ class MarigoldDepthPipeline(DiffusionPipeline):
                 logging.info(f"  rescale_betas_zero_snr: {self.scheduler.config.rescale_betas_zero_snr}")
                 logging.info(f"  clip_sample: {self.scheduler.config.clip_sample}")
                 logging.info(f"  clip_sample_range: {self.scheduler.config.clip_sample_range}")
+                
+                # Log intermediate calculations
+                alpha_t = alphas[idx]
+                alpha_t_prev = alphas[idx + 1] if idx + 1 < len(alphas) else 1.0
+                beta_t = betas[idx]
+                
+                # For epsilon prediction type
+                pred_original_sample = (target_latent - beta_t * noise_pred) / alpha_t
+                pred_prev_sample = alpha_t_prev * pred_original_sample + torch.sqrt(1 - alpha_t_prev) * noise_pred
+                
+                logging.info(f"Step {i} - Intermediate calculations:")
+                logging.info(f"  alpha_t: {alpha_t.item():.4f}")
+                logging.info(f"  alpha_t_prev: {alpha_t_prev.item():.4f}")
+                logging.info(f"  beta_t: {beta_t.item():.4f}")
+                logging.info(f"  pred_original_sample: min={pred_original_sample.min().item():.4f}, max={pred_original_sample.max().item():.4f}, mean={pred_original_sample.mean().item():.4f}")
+                logging.info(f"  pred_prev_sample: min={pred_prev_sample.min().item():.4f}, max={pred_prev_sample.max().item():.4f}, mean={pred_prev_sample.mean().item():.4f}")
 
             # compute the previous noisy sample x_t -> x_t-1
             scheduler_output = self.scheduler.step(
