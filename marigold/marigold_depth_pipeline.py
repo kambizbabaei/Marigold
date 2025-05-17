@@ -467,6 +467,9 @@ class MarigoldDepthPipeline(DiffusionPipeline):
             logging.info(f"  beta_schedule: {self.scheduler.config.beta_schedule}")
             logging.info(f"  timestep_spacing: {self.scheduler.config.timestep_spacing}")
 
+            # Add small epsilon to prevent division by zero
+            self.scheduler.alphas_cumprod = self.scheduler.alphas_cumprod + 1e-6
+
         # Encode image
         rgb_latent = self.encode_rgb(rgb_in)  # [B, 4, h, w]
         logging.info(f"RGB latent stats - min: {rgb_latent.min().item():.4f}, max: {rgb_latent.max().item():.4f}, mean: {rgb_latent.mean().item():.4f}")
