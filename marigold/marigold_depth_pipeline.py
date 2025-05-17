@@ -537,6 +537,15 @@ class MarigoldDepthPipeline(DiffusionPipeline):
                 logging.info(f"Step {i} - Scheduler state:")
                 logging.info(f"  alpha: {alphas[idx].item():.4f}")
                 logging.info(f"  beta: {betas[idx].item():.4f}")
+                
+                # Log scheduler config
+                logging.info(f"Step {i} - Scheduler config:")
+                logging.info(f"  prediction_type: {self.scheduler.config.prediction_type}")
+                logging.info(f"  beta_schedule: {self.scheduler.config.beta_schedule}")
+                logging.info(f"  timestep_spacing: {self.scheduler.config.timestep_spacing}")
+                logging.info(f"  rescale_betas_zero_snr: {self.scheduler.config.rescale_betas_zero_snr}")
+                logging.info(f"  clip_sample: {self.scheduler.config.clip_sample}")
+                logging.info(f"  clip_sample_range: {self.scheduler.config.clip_sample_range}")
 
             # compute the previous noisy sample x_t -> x_t-1
             scheduler_output = self.scheduler.step(
