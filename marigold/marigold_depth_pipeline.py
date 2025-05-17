@@ -458,15 +458,14 @@ class MarigoldDepthPipeline(DiffusionPipeline):
             # Move tensors to CPU for logging
             alphas = self.scheduler.alphas_cumprod.to("cpu")
             betas = self.scheduler.betas.to("cpu")
-            alpha_prev = self.scheduler.alphas_cumprod_prev.to("cpu")
-            variance = self.scheduler.variance.to("cpu")
             timesteps_cpu = timesteps.to("cpu")
             
             logging.info("Scheduler state:")
             logging.info(f"  alphas: {alphas[timesteps_cpu].tolist()}")
             logging.info(f"  betas: {betas[timesteps_cpu].tolist()}")
-            logging.info(f"  alpha_prev: {alpha_prev[timesteps_cpu].tolist()}")
-            logging.info(f"  variance: {variance[timesteps_cpu].tolist()}")
+            logging.info(f"  prediction_type: {self.scheduler.config.prediction_type}")
+            logging.info(f"  beta_schedule: {self.scheduler.config.beta_schedule}")
+            logging.info(f"  timestep_spacing: {self.scheduler.config.timestep_spacing}")
 
         # Encode image
         rgb_latent = self.encode_rgb(rgb_in)  # [B, 4, h, w]
@@ -532,16 +531,12 @@ class MarigoldDepthPipeline(DiffusionPipeline):
                 # Move tensors to CPU for logging
                 alphas = self.scheduler.alphas_cumprod.to("cpu")
                 betas = self.scheduler.betas.to("cpu")
-                alpha_prev = self.scheduler.alphas_cumprod_prev.to("cpu")
-                variance = self.scheduler.variance.to("cpu")
                 t_cpu = t.to("cpu")
                 
                 idx = (timesteps_cpu == t_cpu).nonzero().item()
                 logging.info(f"Step {i} - Scheduler state:")
                 logging.info(f"  alpha: {alphas[idx].item():.4f}")
                 logging.info(f"  beta: {betas[idx].item():.4f}")
-                logging.info(f"  alpha_prev: {alpha_prev[idx].item():.4f}")
-                logging.info(f"  variance: {variance[idx].item():.4f}")
 
             # compute the previous noisy sample x_t -> x_t-1
             scheduler_output = self.scheduler.step(
