@@ -491,11 +491,19 @@ class MarigoldDepthPipeline(DiffusionPipeline):
                 logging.error(f"NaN values found in noise prediction at step {i}!")
                 logging.error(f"Noise pred stats - min: {noise_pred.min().item():.4f}, max: {noise_pred.max().item():.4f}, mean: {noise_pred.mean().item():.4f}")
 
+            # Log values before scheduler step
+            logging.info(f"Step {i} - Before scheduler - noise_pred: min={noise_pred.min().item():.4f}, max={noise_pred.max().item():.4f}, mean={noise_pred.mean().item():.4f}")
+            logging.info(f"Step {i} - Before scheduler - target_latent: min={target_latent.min().item():.4f}, max={target_latent.max().item():.4f}, mean={target_latent.mean().item():.4f}")
+            logging.info(f"Step {i} - Before scheduler - timestep: {t.item()}")
+
             # compute the previous noisy sample x_t -> x_t-1
             scheduler_output = self.scheduler.step(
                 noise_pred, t, target_latent, generator=generator
             )
             target_latent = scheduler_output.prev_sample
+
+            # Log values after scheduler step
+            logging.info(f"Step {i} - After scheduler - target_latent: min={target_latent.min().item():.4f}, max={target_latent.max().item():.4f}, mean={target_latent.mean().item():.4f}")
 
             if torch.isnan(target_latent).any():
                 logging.error(f"NaN values found in target latent at step {i}!")
