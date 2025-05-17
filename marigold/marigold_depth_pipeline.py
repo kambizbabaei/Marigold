@@ -419,12 +419,20 @@ class MarigoldDepthPipeline(DiffusionPipeline):
         device = self.device
         rgb_in = rgb_in.to(device)
 
+        # Log input statistics
+        logging.info(f"Input RGB stats - min: {rgb_in.min().item():.4f}, max: {rgb_in.max().item():.4f}, mean: {rgb_in.mean().item():.4f}")
+        if torch.isnan(rgb_in).any():
+            logging.error("NaN values found in input RGB!")
+
         # Set timesteps
         self.scheduler.set_timesteps(num_inference_steps, device=device)
         timesteps = self.scheduler.timesteps  # [T]
 
         # Encode image
         rgb_latent = self.encode_rgb(rgb_in)  # [B, 4, h, w]
+        logging.info(f"RGB latent stats - min: {rgb_latent.min().item():.4f}, max: {rgb_latent.max().item():.4f}, mean: {rgb_latent.mean().item():.4f}")
+        if torch.isnan(rgb_latent).any():
+            logging.error("NaN values found in RGB latent!")
 
         # Noisy latent for outputs
         target_latent = torch.randn(
@@ -433,6 +441,9 @@ class MarigoldDepthPipeline(DiffusionPipeline):
             dtype=self.dtype,
             generator=generator,
         )  # [B, 4, h, w]
+        logging.info(f"Initial target latent stats - min: {target_latent.min().item():.4f}, max: {target_latent.max().item():.4f}, mean: {target_latent.mean().item():.4f}")
+        if torch.isnan(target_latent).any():
+            logging.error("NaN values found in initial target latent!")
 
         # Batched empty text embedding
         if self.empty_text_embed is None:
@@ -461,18 +472,34 @@ class MarigoldDepthPipeline(DiffusionPipeline):
             noise_pred = self.unet(
                 unet_input, t, encoder_hidden_states=batch_empty_text_embed
             ).sample  # [B, 4, h, w]
+            
+            if torch.isnan(noise_pred).any():
+                logging.error(f"NaN values found in noise prediction at step {i}!")
+                logging.error(f"Noise pred stats - min: {noise_pred.min().item():.4f}, max: {noise_pred.max().item():.4f}, mean: {noise_pred.mean().item():.4f}")
 
             # compute the previous noisy sample x_t -> x_t-1
-            target_latent = self.scheduler.step(
+            scheduler_output = self.scheduler.step(
                 noise_pred, t, target_latent, generator=generator
-            ).prev_sample
+            )
+            target_latent = scheduler_output.prev_sample
+
+            if torch.isnan(target_latent).any():
+                logging.error(f"NaN values found in target latent at step {i}!")
+                logging.error(f"Target latent stats - min: {target_latent.min().item():.4f}, max: {target_latent.max().item():.4f}, mean: {target_latent.mean().item():.4f}")
 
         depth = self.decode_depth(target_latent)  # [B,3,H,W]
+        logging.info(f"Decoded depth stats - min: {depth.min().item():.4f}, max: {depth.max().item():.4f}, mean: {depth.mean().item():.4f}")
+        if torch.isnan(depth).any():
+            logging.error("NaN values found in decoded depth!")
 
         # clip prediction
         depth = torch.clip(depth, -1.0, 1.0)
         # shift to [0, 1]
         depth = (depth + 1.0) / 2.0
+
+        logging.info(f"Final depth stats - min: {depth.min().item():.4f}, max: {depth.max().item():.4f}, mean: {depth.mean().item():.4f}")
+        if torch.isnan(depth).any():
+            logging.error("NaN values found in final depth!")
 
         return depth
 
