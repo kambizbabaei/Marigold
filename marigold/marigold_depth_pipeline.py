@@ -151,6 +151,22 @@ class MarigoldDepthPipeline(DiffusionPipeline):
 
         self.empty_text_embed = None
 
+        # Log scheduler configuration
+        if isinstance(self.scheduler, DDIMScheduler):
+            logging.info("DDIMScheduler configuration:")
+            logging.info(f"  beta_start: {self.scheduler.config.beta_start}")
+            logging.info(f"  beta_end: {self.scheduler.config.beta_end}")
+            logging.info(f"  beta_schedule: {self.scheduler.config.beta_schedule}")
+            logging.info(f"  timestep_spacing: {self.scheduler.config.timestep_spacing}")
+            logging.info(f"  steps_offset: {self.scheduler.config.steps_offset}")
+            logging.info(f"  rescale_betas_zero_snr: {self.scheduler.config.rescale_betas_zero_snr}")
+            logging.info(f"  prediction_type: {self.scheduler.config.prediction_type}")
+            logging.info(f"  clip_sample: {self.scheduler.config.clip_sample}")
+            logging.info(f"  clip_sample_range: {self.scheduler.config.clip_sample_range}")
+            logging.info(f"  dynamic_thresholding_ratio: {self.scheduler.config.dynamic_thresholding_ratio}")
+            logging.info(f"  sample_max_value: {self.scheduler.config.sample_max_value}")
+            logging.info(f"  thresholding: {self.scheduler.config.thresholding}")
+
     @torch.no_grad()
     def __call__(
         self,
@@ -437,6 +453,14 @@ class MarigoldDepthPipeline(DiffusionPipeline):
         timesteps = self.scheduler.timesteps  # [T]
         logging.info(f"Timesteps: {timesteps.tolist()}")
 
+        # Log scheduler state
+        if isinstance(self.scheduler, DDIMScheduler):
+            logging.info("Scheduler state:")
+            logging.info(f"  alphas: {self.scheduler.alphas_cumprod[timesteps].tolist()}")
+            logging.info(f"  betas: {self.scheduler.betas[timesteps].tolist()}")
+            logging.info(f"  alpha_prev: {self.scheduler.alphas_cumprod_prev[timesteps].tolist()}")
+            logging.info(f"  variance: {self.scheduler.variance[timesteps].tolist()}")
+
         # Encode image
         rgb_latent = self.encode_rgb(rgb_in)  # [B, 4, h, w]
         logging.info(f"RGB latent stats - min: {rgb_latent.min().item():.4f}, max: {rgb_latent.max().item():.4f}, mean: {rgb_latent.mean().item():.4f}")
@@ -495,6 +519,15 @@ class MarigoldDepthPipeline(DiffusionPipeline):
             logging.info(f"Step {i} - Before scheduler - noise_pred: min={noise_pred.min().item():.4f}, max={noise_pred.max().item():.4f}, mean={noise_pred.mean().item():.4f}")
             logging.info(f"Step {i} - Before scheduler - target_latent: min={target_latent.min().item():.4f}, max={target_latent.max().item():.4f}, mean={target_latent.mean().item():.4f}")
             logging.info(f"Step {i} - Before scheduler - timestep: {t.item()}")
+
+            # Log scheduler state for this step
+            if isinstance(self.scheduler, DDIMScheduler):
+                idx = (timesteps == t).nonzero().item()
+                logging.info(f"Step {i} - Scheduler state:")
+                logging.info(f"  alpha: {self.scheduler.alphas_cumprod[idx].item():.4f}")
+                logging.info(f"  beta: {self.scheduler.betas[idx].item():.4f}")
+                logging.info(f"  alpha_prev: {self.scheduler.alphas_cumprod_prev[idx].item():.4f}")
+                logging.info(f"  variance: {self.scheduler.variance[idx].item():.4f}")
 
             # compute the previous noisy sample x_t -> x_t-1
             scheduler_output = self.scheduler.step(
