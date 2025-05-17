@@ -553,6 +553,8 @@ class MarigoldDepthPipeline(DiffusionPipeline):
                 beta_t = betas[idx]
                 
                 # For epsilon prediction type
+                # Add small epsilon to prevent division by zero
+                alpha_t = alpha_t + 1e-6
                 pred_original_sample = (target_latent - beta_t * noise_pred) / alpha_t
                 pred_prev_sample = alpha_t_prev * pred_original_sample + torch.sqrt(1 - alpha_t_prev) * noise_pred
                 
