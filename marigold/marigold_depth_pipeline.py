@@ -419,6 +419,14 @@ class MarigoldDepthPipeline(DiffusionPipeline):
         device = self.device
         rgb_in = rgb_in.to(device)
 
+        # Log model state
+        logging.info(f"Model device: {device}")
+        logging.info(f"Model dtype: {self.dtype}")
+        logging.info(f"UNet device: {next(self.unet.parameters()).device}")
+        logging.info(f"VAE device: {next(self.vae.parameters()).device}")
+        logging.info(f"Scheduler type: {type(self.scheduler).__name__}")
+        logging.info(f"Number of inference steps: {num_inference_steps}")
+
         # Log input statistics
         logging.info(f"Input RGB stats - min: {rgb_in.min().item():.4f}, max: {rgb_in.max().item():.4f}, mean: {rgb_in.mean().item():.4f}")
         if torch.isnan(rgb_in).any():
@@ -427,6 +435,7 @@ class MarigoldDepthPipeline(DiffusionPipeline):
         # Set timesteps
         self.scheduler.set_timesteps(num_inference_steps, device=device)
         timesteps = self.scheduler.timesteps  # [T]
+        logging.info(f"Timesteps: {timesteps.tolist()}")
 
         # Encode image
         rgb_latent = self.encode_rgb(rgb_in)  # [B, 4, h, w]
@@ -451,6 +460,7 @@ class MarigoldDepthPipeline(DiffusionPipeline):
         batch_empty_text_embed = self.empty_text_embed.repeat(
             (rgb_latent.shape[0], 1, 1)
         ).to(device)  # [B, 2, 1024]
+        logging.info(f"Text embedding stats - min: {batch_empty_text_embed.min().item():.4f}, max: {batch_empty_text_embed.max().item():.4f}, mean: {batch_empty_text_embed.mean().item():.4f}")
 
         # Denoising loop
         if show_pbar:
@@ -467,6 +477,10 @@ class MarigoldDepthPipeline(DiffusionPipeline):
             unet_input = torch.cat(
                 [rgb_latent, target_latent], dim=1
             )  # this order is important
+            
+            logging.info(f"Step {i} - UNet input stats - min: {unet_input.min().item():.4f}, max: {unet_input.max().item():.4f}, mean: {unet_input.mean().item():.4f}")
+            if torch.isnan(unet_input).any():
+                logging.error(f"NaN values found in UNet input at step {i}!")
 
             # predict the noise residual
             noise_pred = self.unet(
