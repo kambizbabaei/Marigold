@@ -30,7 +30,9 @@
 
 import numpy as np
 import torch
+import logging
 
+logger = logging.getLogger(__name__)
 
 def align_depth_least_square(
     gt_arr: np.ndarray,
@@ -40,14 +42,31 @@ def align_depth_least_square(
     max_resolution=None,
 ):
     ori_shape = pred_arr.shape  # input shape
+    logger.info(f"Original shape: {ori_shape}")
 
     gt = gt_arr.squeeze()  # [H, W]
     pred = pred_arr.squeeze()
     valid_mask = valid_mask_arr.squeeze()
 
+    # Log input statistics
+    logger.info(f"GT stats - min: {np.min(gt):.4f}, max: {np.max(gt):.4f}, mean: {np.mean(gt):.4f}")
+    logger.info(f"Pred stats - min: {np.min(pred):.4f}, max: {np.max(pred):.4f}, mean: {np.mean(pred):.4f}")
+    logger.info(f"Valid mask - True count: {np.sum(valid_mask)}, Total: {valid_mask.size}")
+
+    # Check for NaN and Inf values
+    if np.isnan(gt).any():
+        logger.error("NaN values found in GT!")
+    if np.isnan(pred).any():
+        logger.error("NaN values found in prediction!")
+    if np.isinf(gt).any():
+        logger.error("Inf values found in GT!")
+    if np.isinf(pred).any():
+        logger.error("Inf values found in prediction!")
+
     # Downsample
     if max_resolution is not None:
         scale_factor = np.min(max_resolution / np.array(ori_shape[-2:]))
+        logger.info(f"Downsampling with scale factor: {scale_factor:.4f}")
         if scale_factor < 1:
             downscaler = torch.nn.Upsample(scale_factor=scale_factor, mode="nearest")
             gt = downscaler(torch.as_tensor(gt).unsqueeze(0)).numpy()
@@ -57,6 +76,7 @@ def align_depth_least_square(
                 .bool()
                 .numpy()
             )
+            logger.info(f"Downsampled shape: {gt.shape}")
 
     assert (
         gt.shape == pred.shape == valid_mask.shape
@@ -65,13 +85,44 @@ def align_depth_least_square(
     gt_masked = gt[valid_mask].reshape((-1, 1))
     pred_masked = pred[valid_mask].reshape((-1, 1))
 
+    # Log masked data statistics
+    logger.info(f"Masked GT stats - min: {np.min(gt_masked):.4f}, max: {np.max(gt_masked):.4f}, mean: {np.mean(gt_masked):.4f}")
+    logger.info(f"Masked Pred stats - min: {np.min(pred_masked):.4f}, max: {np.max(pred_masked):.4f}, mean: {np.mean(pred_masked):.4f}")
+    logger.info(f"Number of valid points: {len(gt_masked)}")
+
     # numpy solver
     _ones = np.ones_like(pred_masked)
     A = np.concatenate([pred_masked, _ones], axis=-1)
-    X = np.linalg.lstsq(A, gt_masked, rcond=None)[0]
-    scale, shift = X
+    
+    # Log matrix condition
+    try:
+        condition_number = np.linalg.cond(A)
+        logger.info(f"Matrix condition number: {condition_number:.4e}")
+    except:
+        logger.error("Failed to compute condition number")
+
+    try:
+        X = np.linalg.lstsq(A, gt_masked, rcond=None)[0]
+        scale, shift = X
+        logger.info(f"Computed scale: {scale:.4f}, shift: {shift:.4f}")
+    except np.linalg.LinAlgError as e:
+        logger.error(f"Least squares failed: {str(e)}")
+        # Try with a more stable rcond
+        try:
+            X = np.linalg.lstsq(A, gt_masked, rcond=1e-4)[0]
+            scale, shift = X
+            logger.info(f"Computed scale (with rcond=1e-4): {scale:.4f}, shift: {shift:.4f}")
+        except np.linalg.LinAlgError as e:
+            logger.error(f"Least squares failed even with rcond=1e-4: {str(e)}")
+            # Fallback to simple scaling
+            scale = np.mean(gt_masked) / np.mean(pred_masked)
+            shift = 0
+            logger.info(f"Using fallback scale: {scale:.4f}, shift: {shift:.4f}")
 
     aligned_pred = pred_arr * scale + shift
+
+    # Log aligned prediction statistics
+    logger.info(f"Aligned pred stats - min: {np.min(aligned_pred):.4f}, max: {np.max(aligned_pred):.4f}, mean: {np.mean(aligned_pred):.4f}")
 
     # restore dimensions
     aligned_pred = aligned_pred.reshape(ori_shape)
