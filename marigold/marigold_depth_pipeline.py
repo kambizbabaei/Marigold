@@ -455,11 +455,18 @@ class MarigoldDepthPipeline(DiffusionPipeline):
 
         # Log scheduler state
         if isinstance(self.scheduler, DDIMScheduler):
+            # Move tensors to CPU for logging
+            alphas = self.scheduler.alphas_cumprod.to("cpu")
+            betas = self.scheduler.betas.to("cpu")
+            alpha_prev = self.scheduler.alphas_cumprod_prev.to("cpu")
+            variance = self.scheduler.variance.to("cpu")
+            timesteps_cpu = timesteps.to("cpu")
+            
             logging.info("Scheduler state:")
-            logging.info(f"  alphas: {self.scheduler.alphas_cumprod[timesteps].tolist()}")
-            logging.info(f"  betas: {self.scheduler.betas[timesteps].tolist()}")
-            logging.info(f"  alpha_prev: {self.scheduler.alphas_cumprod_prev[timesteps].tolist()}")
-            logging.info(f"  variance: {self.scheduler.variance[timesteps].tolist()}")
+            logging.info(f"  alphas: {alphas[timesteps_cpu].tolist()}")
+            logging.info(f"  betas: {betas[timesteps_cpu].tolist()}")
+            logging.info(f"  alpha_prev: {alpha_prev[timesteps_cpu].tolist()}")
+            logging.info(f"  variance: {variance[timesteps_cpu].tolist()}")
 
         # Encode image
         rgb_latent = self.encode_rgb(rgb_in)  # [B, 4, h, w]
@@ -522,12 +529,19 @@ class MarigoldDepthPipeline(DiffusionPipeline):
 
             # Log scheduler state for this step
             if isinstance(self.scheduler, DDIMScheduler):
-                idx = (timesteps == t).nonzero().item()
+                # Move tensors to CPU for logging
+                alphas = self.scheduler.alphas_cumprod.to("cpu")
+                betas = self.scheduler.betas.to("cpu")
+                alpha_prev = self.scheduler.alphas_cumprod_prev.to("cpu")
+                variance = self.scheduler.variance.to("cpu")
+                t_cpu = t.to("cpu")
+                
+                idx = (timesteps_cpu == t_cpu).nonzero().item()
                 logging.info(f"Step {i} - Scheduler state:")
-                logging.info(f"  alpha: {self.scheduler.alphas_cumprod[idx].item():.4f}")
-                logging.info(f"  beta: {self.scheduler.betas[idx].item():.4f}")
-                logging.info(f"  alpha_prev: {self.scheduler.alphas_cumprod_prev[idx].item():.4f}")
-                logging.info(f"  variance: {self.scheduler.variance[idx].item():.4f}")
+                logging.info(f"  alpha: {alphas[idx].item():.4f}")
+                logging.info(f"  beta: {betas[idx].item():.4f}")
+                logging.info(f"  alpha_prev: {alpha_prev[idx].item():.4f}")
+                logging.info(f"  variance: {variance[idx].item():.4f}")
 
             # compute the previous noisy sample x_t -> x_t-1
             scheduler_output = self.scheduler.step(
